@@ -1,0 +1,28 @@
+{
+  "name": "noise-texture",
+  "version": "1.0.0",
+  "description": "A Tailwind CSS plugin for noise effects",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "files": [
+    "index.js",
+    "md.png"
+  ],
+  "keywords": [
+    "tailwind",
+    "css",
+    "plugin"
+  ],
+  "author": "Liam McKenna",
+  "license": "MIT",
+  "type": "commonjs",
+  "peerDependencies": {
+    "tailwindcss": "^3.4.17"
+  },
+  "private": true,
+  "dependencies": {
+    "canvas": "^3.1.0"
+  }
+}
