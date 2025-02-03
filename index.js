@@ -121,7 +121,7 @@ class NoiseCache {
     }
 }
 
-const noiseClassBase = (mean, stdDev) => {
+const noiseClassBase = (mean, stdDev, filename) => {
     return {
         '--noise-mean': mean,
         '--noise-dev': stdDev,
@@ -134,15 +134,12 @@ const noiseClassBase = (mean, stdDev) => {
             left: '0',
             width: '100%',
             height: '100%',
-            backgroundImage: `url('/noise-patterns/${cache.getFilename(mean, stdDev)}')`,
+            backgroundImage: `url('/noise-patterns/${filename}')`,
             backgroundRepeat: 'repeat',
             pointerEvents: 'none',
-            zIndex: '0',
             opacity: 'var(--noise-opacity, 0.05)',
         },
-        '> *': {
-            zIndex: '1'
-        }
+       
     };
 }
 /**
@@ -162,9 +159,10 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
     const defaultMean = 128;
     const defaultStdDev = 20;
     cache.generate(defaultMean, defaultStdDev);
-    
+    const filename = cache.getFilename(defaultMean, defaultStdDev)
+
     addBase({
-        '.noise': noiseClassBase(defaultMean, defaultStdDev)
+        '.noise': noiseClassBase(defaultMean, defaultStdDev, filename)
     });
 
     matchUtilities(
@@ -182,16 +180,15 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
                     if (isNaN(mean) || isNaN(stdDev)) {
                         throw new Error('Mean and Standard Deviation must be valid numbers');
                     }
-
-                    const filename = cache.generate(mean, stdDev);
-                    
-                    return noiseClassBase(mean, stdDev);
+                    const filename = cache.getFilename(mean, stdDev)
+                    return noiseClassBase(mean, stdDev, filename);
                     
                 } catch (error) {
                     console.warn(`Noise pattern error: ${error.message}. Using default pattern.`);
                     
                     // Return default noise pattern instead of throwing, to ensure error is contained wihtin this utility
-                    return noiseClassBase(defaultMean, defaultStdDev);
+                    const filename = cache.getFilename(defaultMean, defaultStdDev)
+                    return noiseClassBase(defaultMean, defaultStdDev, filename);
                     
                 }
             }
