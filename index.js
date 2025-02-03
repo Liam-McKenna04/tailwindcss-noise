@@ -145,6 +145,7 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
             '--noise-mean': defaultMean,
             '--noise-dev': defaultStdDev,
             position: 'relative',
+            isolation: 'isolate',
             '&::before': {
                 content: '""',
                 position: 'absolute',
@@ -157,7 +158,13 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
                 pointerEvents: 'none',
                 zIndex: '0',
                 opacity: 'var(--noise-opacity, 0.05)',
+            },
+            '> *': {
+                zIndex: '10'
             }
+
+
+
         }
     });
 
@@ -183,6 +190,8 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
                         '--noise-mean': mean,
                         '--noise-dev': stdDev,
                         position: 'relative',
+                        isolation: 'isolate',
+
                         '&::before': {
                             content: '""',
                             position: 'absolute',
@@ -195,6 +204,9 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
                             pointerEvents: 'none',
                             zIndex: '0',
                             opacity: 'var(--noise-opacity, 0.05)',
+                        },
+                       '> *': {
+                            zIndex: '10'
                         }
                     };
                 } catch (error) {
@@ -206,6 +218,7 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
                         '--noise-mean': defaultMean,
                         '--noise-dev': defaultStdDev,
                         position: 'relative',
+                        isolation: 'isolate',
                         '&::before': {
                             content: '""',
                             position: 'absolute',
@@ -216,9 +229,12 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
                             backgroundImage: `url('/noise-patterns/${filename}')`,
                             backgroundRepeat: 'repeat',
                             pointerEvents: 'none',
-                            zIndex: '0',
+                            zIndex: '-1',                            
                             opacity: 'var(--noise-opacity, 0.2)',
-                        }
+                        },
+                    '> *': {
+                            zIndex: '10'
+                     }
                     };
                 }
             }
