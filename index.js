@@ -113,7 +113,6 @@ class NoiseCache {
             if (file.startsWith('noise-') && file.endsWith('.png')) {
                 if (!this.usedPatterns.has(file)) {
                     fs.unlinkSync(path.join(this.outputDir, file));
-                    console.log(`Removed unused noise pattern: ${file}`);
                 }
             }
         });

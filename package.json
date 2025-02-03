@@ -1,6 +1,6 @@
 {
   "name": "tailwindcss-noise",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A Tailwind CSS plugin for noise effects",
   "main": "index.js",
   "scripts": {
@@ -27,7 +27,6 @@
   "peerDependencies": {
     "tailwindcss": "^3.4.17"
   },
-  "private": true,
   "dependencies": {
     "canvas": "^3.1.0"
   }
