@@ -121,7 +121,30 @@ class NoiseCache {
     }
 }
 
-
+const noiseClassBase = (mean, stdDev) => {
+    return {
+        '--noise-mean': mean,
+        '--noise-dev': stdDev,
+        position: 'relative',
+        isolation: 'isolate',
+        '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '100%',
+            backgroundImage: `url('/noise-patterns/${cache.getFilename(mean, stdDev)}')`,
+            backgroundRepeat: 'repeat',
+            pointerEvents: 'none',
+            zIndex: '0',
+            opacity: 'var(--noise-opacity, 0.05)',
+        },
+        '> *': {
+            zIndex: '1'
+        }
+    };
+}
 /**
  * Tailwind CSS plugin that adds noise pattern utilities.
  * Provides classes for adding configurable noise patterns to elements.
@@ -141,31 +164,7 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
     cache.generate(defaultMean, defaultStdDev);
     
     addBase({
-        '.noise': {
-            '--noise-mean': defaultMean,
-            '--noise-dev': defaultStdDev,
-            position: 'relative',
-            isolation: 'isolate',
-            '&::before': {
-                content: '""',
-                position: 'absolute',
-                top: '0',
-                left: '0',
-                width: '100%',
-                height: '100%',
-                backgroundImage: `url('/noise-patterns/${cache.getFilename(defaultMean, defaultStdDev)}')`,
-                backgroundRepeat: 'repeat',
-                pointerEvents: 'none',
-                zIndex: '0',
-                opacity: 'var(--noise-opacity, 0.05)',
-            },
-            '> *': {
-                zIndex: '10'
-            }
-
-
-
-        }
+        '.noise': noiseClassBase(defaultMean, defaultStdDev)
     });
 
     matchUtilities(
@@ -186,56 +185,14 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
 
                     const filename = cache.generate(mean, stdDev);
                     
-                    return {
-                        '--noise-mean': mean,
-                        '--noise-dev': stdDev,
-                        position: 'relative',
-                        isolation: 'isolate',
-
-                        '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            top: '0',
-                            left: '0',
-                            width: '100%',
-                            height: '100%',
-                            backgroundImage: `url('/noise-patterns/${filename}')`,
-                            backgroundRepeat: 'repeat',
-                            pointerEvents: 'none',
-                            zIndex: '0',
-                            opacity: 'var(--noise-opacity, 0.05)',
-                        },
-                       '> *': {
-                            zIndex: '10'
-                        }
-                    };
+                    return noiseClassBase(mean, stdDev);
+                    
                 } catch (error) {
                     console.warn(`Noise pattern error: ${error.message}. Using default pattern.`);
-                    const filename = cache.generate(defaultMean, defaultStdDev);
                     
                     // Return default noise pattern instead of throwing, to ensure error is contained wihtin this utility
-                    return {
-                        '--noise-mean': defaultMean,
-                        '--noise-dev': defaultStdDev,
-                        position: 'relative',
-                        isolation: 'isolate',
-                        '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            top: '0',
-                            left: '0',
-                            width: '100%',
-                            height: '100%',
-                            backgroundImage: `url('/noise-patterns/${filename}')`,
-                            backgroundRepeat: 'repeat',
-                            pointerEvents: 'none',
-                            zIndex: '-1',                            
-                            opacity: 'var(--noise-opacity, 0.2)',
-                        },
-                    '> *': {
-                            zIndex: '10'
-                     }
-                    };
+                    return noiseClassBase(defaultMean, defaultStdDev);
+                    
                 }
             }
         },
