@@ -27,7 +27,7 @@ function randn_bm() {
  * @param {number} stdDev - The standard deviation for the Gaussian distribution (default: 20)
  * @returns {string} Base64 encoded data URL of the generated noise pattern
  */
-function generateNoisePattern(mean = 128, stdDev = 20) {
+function generateNoisePattern(mean = 128, stdDev = 20, opacity = 20) {
     const { createCanvas } = require('canvas');
     const CANVAS_SIZE = 256; // Chosen as a good balance between performance and noise repitition
     const canvas = createCanvas(CANVAS_SIZE, CANVAS_SIZE);
@@ -49,7 +49,7 @@ function generateNoisePattern(mean = 128, stdDev = 20) {
         data[i] = pixelValue;     // R
         data[i + 1] = pixelValue; // G
         data[i + 2] = pixelValue; // B
-        data[i + 3] = 255;        // Full Opacity
+        data[i + 3] = 255 * (opacity / 100); // A
     }
     
     ctx.putImageData(imageData, 0, 0);
@@ -73,27 +73,27 @@ class NoiseCache {
     }
 
   
-    getFilename(mean, stdDev) {
-        return `noise-${Math.round(mean)}-${Math.round(stdDev)}.png`;
+    getFilename(mean, stdDev, opacity) {
+        return `noise-${Math.round(mean)}-${Math.round(stdDev)}-${Math.round(opacity)}.png`;
     }
 
     getFilePath(filename) {
         return path.join(this.outputDir, filename);
     }
 
-    exists(mean, stdDev) {
-        const filename = this.getFilename(mean, stdDev);
+    exists(mean, stdDev, opacity) {
+        const filename = this.getFilename(mean, stdDev, opacity);
         return fs.existsSync(this.getFilePath(filename));
     }
 
-    generate(mean, stdDev) {
-        const filename = this.getFilename(mean, stdDev);
+    generate(mean, stdDev, opacity) {
+        const filename = this.getFilename(mean, stdDev, opacity);
         const filePath = this.getFilePath(filename);
 
         this.usedPatterns.add(filename);
 
-        if (!this.exists(mean, stdDev)) {
-            const pattern = generateNoisePattern(mean, stdDev);
+        if (!this.exists(mean, stdDev, opacity)) {
+            const pattern = generateNoisePattern(mean, stdDev, opacity);
             const base64Data = pattern.replace(/^data:image\/\w+;base64,/, '');
             const buffer = Buffer.from(base64Data, 'base64');
             fs.writeFileSync(filePath, buffer);
@@ -121,25 +121,10 @@ class NoiseCache {
     }
 }
 
-const noiseClassBase = (mean, stdDev, filename) => {
+const noiseClassBase = (filename) => {
     return {
-        '--noise-mean': mean,
-        '--noise-dev': stdDev,
-        position: 'relative',
-        isolation: 'isolate',
-        '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: '0',
-            left: '0',
-            width: '100%',
-            height: '100%',
-            backgroundImage: `url('/noise-patterns/${filename}')`,
-            backgroundRepeat: 'repeat',
-            pointerEvents: 'none',
-            opacity: 'var(--noise-opacity, 0.05)',
-        },
-       
+        'background-image': `url('/noise-patterns/${filename}')`,
+        'background-repeat': 'repeat',
     };
 }
 /**
@@ -148,21 +133,21 @@ const noiseClassBase = (mean, stdDev, filename) => {
  * 
  * Usage:
  * - Basic noise: class="noise"
- * - Custom noise: class="noise-[mean,stddev]"
+ * - Custom noise: class="noise-[mean,stddev,opacity]" (e.g., noise-[128,20,20])
  * - Preset noise: class="noise-subtle|medium|strong"
- * - Opacity control: class="noise-opacity-[value]"
  */
 module.exports = plugin(({ addBase, matchUtilities, theme }) => {
     const cache = new NoiseCache();
     cache.cleanup();
     
     const defaultMean = 128;
-    const defaultStdDev = 20;
-    cache.generate(defaultMean, defaultStdDev);
-    const filename = cache.getFilename(defaultMean, defaultStdDev)
+    const defaultStdDev = 50;
+    const defaultOpacity = 5;
+    cache.generate(defaultMean, defaultStdDev, defaultOpacity);
+    const filename = cache.getFilename(defaultMean, defaultStdDev, defaultOpacity)
 
     addBase({
-        '.noise': noiseClassBase(defaultMean, defaultStdDev, filename)
+        '.noise': noiseClassBase(filename)
     });
 
     matchUtilities(
@@ -170,47 +155,46 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
             'noise': (value) => {
                 try {
                     if (!value || !value.includes(',')) {
-                        throw new Error('Invalid format. Usage: noise-[mean,dev] (e.g., noise-[128,20])');
+                        throw new Error('Invalid format. Usage: noise-[mean,dev,opacity] (e.g., noise-[128,20,20])');
+                    }
+                    
+
+                    const [meanStr, stdDevStr, opacityStr] = value.split(',').map(v => v.trim());
+                    const mean = parseInt(meanStr.trim());
+                    const stdDev = parseInt(stdDevStr.trim());
+                    const opacity = parseInt(opacityStr.trim());
+
+                    if (isNaN(mean) || isNaN(stdDev) || isNaN(opacity)) {
+                        throw new Error('Mean, Standard Deviation, and Opacity must be valid numbers');
                     }
 
-                    const [meanStr, stdDevStr] = value.split(',').map(v => v.trim());
-                    const mean = parseInt(meanStr);
-                    const stdDev = parseInt(stdDevStr);
-
-                    if (isNaN(mean) || isNaN(stdDev)) {
-                        throw new Error('Mean and Standard Deviation must be valid numbers');
+                    if (opacity < 0 || opacity > 100) {
+                        throw new Error('Opacity must be between 0 and 100');
                     }
-                    const filename = cache.getFilename(mean, stdDev)
-                    return noiseClassBase(mean, stdDev, filename);
+
+                    cache.generate(mean, stdDev, opacity);
+                    const filename = cache.getFilename(mean, stdDev, opacity)
+                    return noiseClassBase(filename);
                     
                 } catch (error) {
                     console.warn(`Noise pattern error: ${error.message}. Using default pattern.`);
                     
                     // Return default noise pattern instead of throwing, to ensure error is contained wihtin this utility
-                    const filename = cache.getFilename(defaultMean, defaultStdDev)
-                    return noiseClassBase(defaultMean, defaultStdDev, filename);
+                    const filename = cache.getFilename(defaultMean, defaultStdDev, defaultOpacity)
+                    return noiseClassBase(filename);
                     
                 }
             }
         },
         {
             values: theme('noise', {
-                subtle: "100,20",
-                medium: "128,50",
-                strong: "128,100",
+                subtle: "100,20,5",
+                medium: "128,50,5",
+                strong: "128,100,5",
             }),
         }
     );
 
-    matchUtilities(
-        {
-            'noise-opacity': (value) => ({
-                '--noise-opacity': value
-            })
-        },
-        {
-            values: theme('opacity', {})
-        }
-    );
+    
 
 });
