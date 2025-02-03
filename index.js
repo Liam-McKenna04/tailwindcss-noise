@@ -10,8 +10,7 @@ function randn_bm() {
     return num;
 }
 
-function generateNoiseDataURL(mean = 128, stdDev = 20) {
-    // Note: Using Node Canvas for SSR/build time generation
+function generateNoisePattern(mean = 128, stdDev = 20) {
     const { createCanvas } = require('canvas');
     const CANVAS_SIZE = 256;
     const canvas = createCanvas(CANVAS_SIZE, CANVAS_SIZE);
@@ -27,76 +26,134 @@ function generateNoiseDataURL(mean = 128, stdDev = 20) {
         const Z = randn_bm();
         const pixelValue = Math.min(255, Math.max(0, Math.floor((Z * stdDev) + mean)));
         
-        data[i] = pixelValue;     // R
-        data[i + 1] = pixelValue; // G
-        data[i + 2] = pixelValue; // B
-        data[i + 3] = 255;        // A
+        data[i] = pixelValue;
+        data[i + 1] = pixelValue;
+        data[i + 2] = pixelValue;
+        data[i + 3] = 255;
     }
     
     ctx.putImageData(imageData, 0, 0);
     return canvas.toDataURL();
 }
 
-// Cache for storing generated patterns
-const noisePatternCache = new Map();
-
-// Function to generate or retrieve cached pattern
-function getNoisePattern(mean, stdDev) {
-    const key = `${mean}-${stdDev}`;
-    if (!noisePatternCache.has(key)) {
-        noisePatternCache.set(key, generateNoiseDataURL(mean, stdDev));
+// Cache management
+class NoiseCache {
+    constructor() {
+        this.outputDir = path.join(process.cwd(), 'public', 'noise-patterns');
+        if (!fs.existsSync(this.outputDir)) {
+            fs.mkdirSync(this.outputDir, { recursive: true });
+        }
     }
-    return noisePatternCache.get(key);
+
+    getFilename(mean, stdDev) {
+        return `noise-${Math.round(mean)}-${Math.round(stdDev)}.png`;
+    }
+
+    getFilePath(filename) {
+        return path.join(this.outputDir, filename);
+    }
+
+    exists(mean, stdDev) {
+        const filename = this.getFilename(mean, stdDev);
+        return fs.existsSync(this.getFilePath(filename));
+    }
+
+    generate(mean, stdDev) {
+        const filename = this.getFilename(mean, stdDev);
+        const filePath = this.getFilePath(filename);
+
+        if (!this.exists(mean, stdDev)) {
+            console.log("generating new image!!")
+            const pattern = generateNoisePattern(mean, stdDev);
+            const base64Data = pattern.replace(/^data:image\/\w+;base64,/, '');
+            const buffer = Buffer.from(base64Data, 'base64');
+            fs.writeFileSync(filePath, buffer);
+        }
+
+        return filename;
+    }
 }
 
-// Ensure output directory exists
-const outputDir = path.join(process.cwd(), 'public', 'noise-patterns');
-if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-}
-
-module.exports = plugin(({ matchUtilities, theme }) => {
-    // Generate preset patterns at build time
-    const presetPatterns = theme('noise', {});
-    Object.entries(presetPatterns).forEach(([key, { mean, stdDev }]) => {
-        const pattern = getNoisePattern(mean, stdDev);
-        const fileName = `noise-${key}.png`;
-        // Convert data URL to buffer and save
-        const base64Data = pattern.replace(/^data:image\/\w+;base64,/, '');
-        const buffer = Buffer.from(base64Data, 'base64');
-        fs.writeFileSync(path.join(outputDir, fileName), buffer);
+module.exports = plugin(({ addBase, matchUtilities, theme }) => {
+    const cache = new NoiseCache();
+    
+    // Generate default pattern
+    const defaultMean = 128;
+    const defaultStdDev = 20;
+    cache.generate(defaultMean, defaultStdDev);
+    
+    // Base styles
+    addBase({
+        '.noise': {
+            '--noise-mean': defaultMean,
+            '--noise-dev': defaultStdDev,
+            position: 'relative',
+            '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: '0',
+                left: '0',
+                width: '100%',
+                height: '100%',
+                backgroundImage: `url('/noise-patterns/${cache.getFilename(defaultMean, defaultStdDev)}')`,
+                backgroundRepeat: 'repeat',
+                pointerEvents: 'none',
+                zIndex: '0',
+                opacity: '0.05'
+            }
+        }
     });
-    // Add noise utilities
+
+    // Dynamic utility that handles both mean and dev
     matchUtilities(
         {
             'noise': (value) => {
-                if (typeof value === 'string' && presetPatterns[value]) {
-                    // Use pre-generated pattern for preset values
-                    return {
-                        backgroundImage: `url('/noise-patterns/noise-${value}.png')`
-                    };
-                } else {
-                    // Generate pattern for arbitrary values at build time
-                    console.log(value);
-                    const mean = parseInt(value?.mean ?? 128);
-                    const stdDev = parseInt(value?.stdDev ?? 20);
-                    const pattern = getNoisePattern(mean, stdDev);
-                    const fileName = `noise-${mean}-${stdDev}.png`;
-                    
-                    // Save the pattern
-                    const base64Data = pattern.replace(/^data:image\/\w+;base64,/, '');
-                    const buffer = Buffer.from(base64Data, 'base64');
-                    fs.writeFileSync(path.join(outputDir, fileName), buffer);
-                    
-                    return {
-                        backgroundImage: `url('/noise-patterns/${fileName}')`
-                    };
-                }
+                console.log(value);
+                console.log('hello!!')
+                const mean = value?.mean ?? defaultMean;
+                const stdDev = value?.dev ?? defaultStdDev;
+                const filename = cache.generate(mean, stdDev);
+                
+                return {
+                    '--noise-mean': mean,
+                    '--noise-dev': stdDev,
+                    '&::before': {
+                        backgroundImage: `url('/noise-patterns/${filename}')`
+                    }
+                };
             }
         },
         {
-            values: theme('noise', {}),
-            type: ['color', 'any']
+            values: theme('noise', {
+                subtle: { mean: 180, dev: 10 },
+                medium: { mean: 128, dev: 20 },
+                strong: { mean: 100, dev: 30 }
+            }),
+            type: ['object', 'number']
+        }
+    );
+
+    // Opacity utility
+    matchUtilities(
+        {
+            'noise-opacity': (value) => ({
+                '--noise-opacity': value
+            })
+        },
+        {
+            values: theme('opacity', {})
+        }
+    );
+
+    // Blend mode utility
+    matchUtilities(
+        {
+            'noise-blend': (value) => ({
+                '--noise-blend-mode': value
+            })
+        },
+        {
+            values: theme('blendMode', {})
         }
     );
 });
