@@ -2,6 +2,14 @@ const plugin = require('tailwindcss/plugin');
 const fs = require('fs');
 const path = require('path');
 
+
+/**
+ * Implements the Box-Muller transform to generate normally distributed random numbers.
+ * This algorithm converts uniformly distributed random numbers into a normal (Gaussian) distribution.
+ * 
+ * @returns {number} A random number from a standard normal distribution (mean = 0, stddev = 1)
+ * @see https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
+ */
 function randn_bm() {
     let u = 0, v = 0;
     while (u === 0) u = Math.random();
@@ -10,41 +18,61 @@ function randn_bm() {
     return num;
 }
 
+
+/**
+ * Generates a noise pattern canvas using Gaussian distribution.
+ * Creates a grayscale noise pattern with specified mean and standard deviation.
+ * 
+ * @param {number} mean - The mean value for the Gaussian distribution (default: 128)
+ * @param {number} stdDev - The standard deviation for the Gaussian distribution (default: 20)
+ * @returns {string} Base64 encoded data URL of the generated noise pattern
+ */
 function generateNoisePattern(mean = 128, stdDev = 20) {
     const { createCanvas } = require('canvas');
-    const CANVAS_SIZE = 256;
+    const CANVAS_SIZE = 256; // Chosen as a good balance between performance and noise repitition
     const canvas = createCanvas(CANVAS_SIZE, CANVAS_SIZE);
     const ctx = canvas.getContext('2d');
     
+    // Set black background
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     
     const imageData = ctx.createImageData(CANVAS_SIZE, CANVAS_SIZE);
     const data = imageData.data;
     
+    // Generate noise pixels using Gaussian distribution
     for (let i = 0; i < data.length; i += 4) {
         const Z = randn_bm();
         const pixelValue = Math.min(255, Math.max(0, Math.floor((Z * stdDev) + mean)));
         
-        data[i] = pixelValue;
-        data[i + 1] = pixelValue;
-        data[i + 2] = pixelValue;
-        data[i + 3] = 255;
+        // Set RGB channels to same value for grayscale
+        data[i] = pixelValue;     // R
+        data[i + 1] = pixelValue; // G
+        data[i + 2] = pixelValue; // B
+        data[i + 3] = 255;        // Full Opacity
     }
     
     ctx.putImageData(imageData, 0, 0);
     return canvas.toDataURL();
 }
 
-// Cache management
+
+
+/**
+ * Manages the generation, caching, and cleanup of noise pattern images.
+ * Implements a simple file-based caching system to avoid regenerating patterns
+ * and provides cleanup functionality to remove unused patterns.
+ */
 class NoiseCache {
     constructor() {
         this.outputDir = path.join(process.cwd(), 'public', 'noise-patterns');
+        this.usedPatterns = new Set();
         if (!fs.existsSync(this.outputDir)) {
             fs.mkdirSync(this.outputDir, { recursive: true });
         }
     }
 
+  
     getFilename(mean, stdDev) {
         return `noise-${Math.round(mean)}-${Math.round(stdDev)}.png`;
     }
@@ -62,8 +90,9 @@ class NoiseCache {
         const filename = this.getFilename(mean, stdDev);
         const filePath = this.getFilePath(filename);
 
+        this.usedPatterns.add(filename);
+
         if (!this.exists(mean, stdDev)) {
-            console.log("generating new image!!")
             const pattern = generateNoisePattern(mean, stdDev);
             const base64Data = pattern.replace(/^data:image\/\w+;base64,/, '');
             const buffer = Buffer.from(base64Data, 'base64');
@@ -72,17 +101,47 @@ class NoiseCache {
 
         return filename;
     }
+
+    /**
+     * Removes all cached noise patterns that weren't used in the current build.
+     * Should be called at the start of each build to maintain clean assets.
+     */
+    cleanup() {
+        const files = fs.readdirSync(this.outputDir);
+        
+        files.forEach(file => {
+            if (file.startsWith('noise-') && file.endsWith('.png')) {
+                if (!this.usedPatterns.has(file)) {
+                    fs.unlinkSync(path.join(this.outputDir, file));
+                    console.log(`Removed unused noise pattern: ${file}`);
+                }
+            }
+        });
+        
+        this.usedPatterns.clear();
+    }
 }
 
+
+/**
+ * Tailwind CSS plugin that adds noise pattern utilities.
+ * Provides classes for adding configurable noise patterns to elements.
+ * 
+ * Usage:
+ * - Basic noise: class="noise"
+ * - Custom noise: class="noise-[mean,stddev]"
+ * - Preset noise: class="noise-subtle|medium|strong"
+ * - Opacity control: class="noise-opacity-[value]"
+ */
 module.exports = plugin(({ addBase, matchUtilities, theme }) => {
     const cache = new NoiseCache();
+    cache.cleanup();
     
     // Generate default pattern
     const defaultMean = 128;
     const defaultStdDev = 20;
     cache.generate(defaultMean, defaultStdDev);
     
-    // Base styles
     addBase({
         '.noise': {
             '--noise-mean': defaultMean,
@@ -104,52 +163,77 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
         }
     });
 
-    // Dynamic utility that handles both mean and dev
     matchUtilities(
         {
             'noise': (value) => {
-                let both = value.split(',')
-                let mean = both[0]
-                let stdDev = both[1]
-                if (stdDev === undefined && mean === undefined) {
-                    mean = defaultMean;
-                    stdDev = defaultStdDev;
-                } else if (stdDev === undefined || mean === undefined) {
-                    throw new Error('Both Mean and Standard Deviation must be provided \n format: noise-[mean-dev]' + value);
-                }
-                console.log('hello!!')
-                const filename = cache.generate(mean, stdDev);
-                
-                return {
-                    '--noise-mean': mean,
-                    '--noise-dev': stdDev,
-                    position: 'relative',
-                    '&::before': {
-                        content: '""',
-                        position: 'absolute',
-                        top: '0',
-                        left: '0',
-                        width: '100%',
-                        height: '100%',
-                        backgroundImage: `url('/noise-patterns/${cache.getFilename(defaultMean, defaultStdDev)}')`,
-                        backgroundRepeat: 'repeat',
-                        pointerEvents: 'none',
-                        zIndex: '0',
-                        opacity: 'var(--noise-opacity, 0.05)',
+                try {
+                    if (!value || !value.includes(',')) {
+                        throw new Error('Invalid format. Usage: noise-[mean,dev] (e.g., noise-[128,20])');
                     }
-            };
+
+                    const [meanStr, stdDevStr] = value.split(',').map(v => v.trim());
+                    const mean = parseInt(meanStr);
+                    const stdDev = parseInt(stdDevStr);
+
+                    if (isNaN(mean) || isNaN(stdDev)) {
+                        throw new Error('Mean and Standard Deviation must be valid numbers');
+                    }
+
+                    const filename = cache.generate(mean, stdDev);
+                    
+                    return {
+                        '--noise-mean': mean,
+                        '--noise-dev': stdDev,
+                        position: 'relative',
+                        '&::before': {
+                            content: '""',
+                            position: 'absolute',
+                            top: '0',
+                            left: '0',
+                            width: '100%',
+                            height: '100%',
+                            backgroundImage: `url('/noise-patterns/${filename}')`,
+                            backgroundRepeat: 'repeat',
+                            pointerEvents: 'none',
+                            zIndex: '0',
+                            opacity: 'var(--noise-opacity, 0.05)',
+                        }
+                    };
+                } catch (error) {
+                    console.warn(`Noise pattern error: ${error.message}. Using default pattern.`);
+                    const filename = cache.generate(defaultMean, defaultStdDev);
+                    
+                    // Return default noise pattern instead of throwing, to ensure error is contained wihtin this utility
+                    return {
+                        '--noise-mean': defaultMean,
+                        '--noise-dev': defaultStdDev,
+                        position: 'relative',
+                        '&::before': {
+                            content: '""',
+                            position: 'absolute',
+                            top: '0',
+                            left: '0',
+                            width: '100%',
+                            height: '100%',
+                            backgroundImage: `url('/noise-patterns/${filename}')`,
+                            backgroundRepeat: 'repeat',
+                            pointerEvents: 'none',
+                            zIndex: '0',
+                            opacity: 'var(--noise-opacity, 0.2)',
+                        }
+                    };
+                }
             }
         },
         {
             values: theme('noise', {
-                subtle: { mean: 180, dev: 10 },
-                medium: { mean: 128, dev: 20 },
-                strong: { mean: 100, dev: 30 }
+                subtle: "100,20",
+                medium: "128,50",
+                strong: "128,100",
             }),
         }
     );
 
-    // Opacity utility
     matchUtilities(
         {
             'noise-opacity': (value) => ({
@@ -161,5 +245,4 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
         }
     );
 
- 
 });
