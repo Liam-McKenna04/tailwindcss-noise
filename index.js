@@ -137,7 +137,6 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
     const cache = new NoiseCache();
     cache.cleanup();
     
-    // Generate default pattern
     const defaultMean = 128;
     const defaultStdDev = 20;
     cache.generate(defaultMean, defaultStdDev);

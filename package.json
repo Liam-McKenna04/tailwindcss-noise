@@ -1,5 +1,5 @@
 {
-  "name": "noise-texture",
+  "name": "tailwindcss-noise",
   "version": "1.0.0",
   "description": "A Tailwind CSS plugin for noise effects",
   "main": "index.js",
@@ -7,13 +7,19 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "files": [
-    "index.js",
-    "md.png"
+    "index.js"
   ],
   "keywords": [
+    "tailwindcss",
     "tailwind",
     "css",
-    "plugin"
+    "plugin",
+    "noise",
+    "gaussian",
+    "grain",
+    "texture",
+    "background",
+    "effect"
   ],
   "author": "Liam McKenna",
   "license": "MIT",
