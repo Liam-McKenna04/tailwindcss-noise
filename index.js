@@ -99,7 +99,7 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
                 backgroundRepeat: 'repeat',
                 pointerEvents: 'none',
                 zIndex: '0',
-                opacity: '0.05'
+                opacity: 'var(--noise-opacity, 0.05)',
             }
         }
     });
@@ -108,19 +108,36 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
     matchUtilities(
         {
             'noise': (value) => {
-                console.log(value);
+                let both = value.split(',')
+                let mean = both[0]
+                let stdDev = both[1]
+                if (stdDev === undefined && mean === undefined) {
+                    mean = defaultMean;
+                    stdDev = defaultStdDev;
+                } else if (stdDev === undefined || mean === undefined) {
+                    throw new Error('Both Mean and Standard Deviation must be provided \n format: noise-[mean-dev]' + value);
+                }
                 console.log('hello!!')
-                const mean = value?.mean ?? defaultMean;
-                const stdDev = value?.dev ?? defaultStdDev;
                 const filename = cache.generate(mean, stdDev);
                 
                 return {
                     '--noise-mean': mean,
                     '--noise-dev': stdDev,
+                    position: 'relative',
                     '&::before': {
-                        backgroundImage: `url('/noise-patterns/${filename}')`
+                        content: '""',
+                        position: 'absolute',
+                        top: '0',
+                        left: '0',
+                        width: '100%',
+                        height: '100%',
+                        backgroundImage: `url('/noise-patterns/${cache.getFilename(defaultMean, defaultStdDev)}')`,
+                        backgroundRepeat: 'repeat',
+                        pointerEvents: 'none',
+                        zIndex: '0',
+                        opacity: 'var(--noise-opacity, 0.05)',
                     }
-                };
+            };
             }
         },
         {
@@ -129,7 +146,6 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
                 medium: { mean: 128, dev: 20 },
                 strong: { mean: 100, dev: 30 }
             }),
-            type: ['object', 'number']
         }
     );
 
@@ -145,15 +161,5 @@ module.exports = plugin(({ addBase, matchUtilities, theme }) => {
         }
     );
 
-    // Blend mode utility
-    matchUtilities(
-        {
-            'noise-blend': (value) => ({
-                '--noise-blend-mode': value
-            })
-        },
-        {
-            values: theme('blendMode', {})
-        }
-    );
+ 
 });
