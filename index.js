@@ -66,7 +66,6 @@ module.exports = plugin(({ matchUtilities, theme }) => {
         const buffer = Buffer.from(base64Data, 'base64');
         fs.writeFileSync(path.join(outputDir, fileName), buffer);
     });
-    console.logp(presetPatterns)
     // Add noise utilities
     matchUtilities(
         {
@@ -78,6 +77,7 @@ module.exports = plugin(({ matchUtilities, theme }) => {
                     };
                 } else {
                     // Generate pattern for arbitrary values at build time
+                    console.log(value);
                     const mean = parseInt(value?.mean ?? 128);
                     const stdDev = parseInt(value?.stdDev ?? 20);
                     const pattern = getNoisePattern(mean, stdDev);
