@@ -72,7 +72,7 @@ You can test different combinations of noise effects on [this website](https://l
 ## Examples of Sites Using Gaussian Textures
 
 - [My Personal Website](https://www.liam-mckenna.dev/)
-- [Relume Library](https://relume-library-cloneable.webflow.io/)
+- [Relume](https://relume-library-cloneable.webflow.io/)
 - [Happygolucky Framer Template](https://happygolucky.framer.website/)
 
 ## License
