@@ -1,6 +1,6 @@
 # Tailwind CSS Noise Plugin
 
-A Tailwind CSS plugin for adding noise effects to your designs using Gaussian distribution.
+A Tailwind CSS plugin for adding noise effects to your designs using a Gaussian distribution.
 
 ## Installation
 
